@@ -1,68 +1,67 @@
+from db import main_db
 import flet as ft
-import os
+
 
 def main(page: ft.Page):
-    page.title = "Мое первое приложение!"
     page.theme_mode = ft.ThemeMode.LIGHT
 
-    greeting_history = []
 
-    greeting_text = ft.Text('История приветствий:')
-    text_hello = ft.Text(value='Hello world')
-
-    if os.path.exists("history.txt"):
-        with open("history.txt", "r", encoding="utf-8") as file:
-            greeting_history = file.readlines()
-            greeting_history = [i.strip() for i in greeting_history]
-
-        greeting_text.value = 'История приветствий:\n' + "\n".join(greeting_history)
-
-    def on_button_click(_):
-        name = name_input.value.strip()
-        print(name)
-
-        if name:
-            text_hello.color = None
-            text_hello.value = f"Hello {name}"
-            name_input.value = None
-
-            greeting_history.append(name)
-
-            greeting_history[:] = greeting_history[-5:]
-
-            greeting_text.value = 'История приветствий:\n' + "\n".join(greeting_history)
-
-            with open("history.txt", "w", encoding="utf-8") as file:
-                file.write("\n".join(greeting_history))
-        else:
-            text_hello.value = 'Введите корректное имя'
-            text_hello.color = ft.Colors.RED
-
-        # page.update()
-
-    elevated_button = ft.ElevatedButton('SEND',icon=ft.Icons.SEND,on_click=on_button_click)
-
-    def clear_history(_):
-        greeting_history.clear()
-        greeting_text.value = 'История приветствий:'
-
-        with open("history.txt", "w", encoding="utf-8") as file:
-            file.write("")
-
-        # page.update()
-
-    clear_button = ft.IconButton(icon=ft.Icons.DELETE,on_click=clear_history)
-
-    name_input = ft.TextField(label='Введите имя',on_submit=on_button_click,expand=True)
-
-    main_object = ft.Row([name_input, elevated_button, clear_button])
-    text_row = ft.Row([text_hello], alignment=ft.MainAxisAlignment.CENTER)
-
-    page.add(text_row, main_object, greeting_text)
-
-ft.app(target=main)
+    task_list = ft.Column(spacing=25)
 
 
 
+    def view_task(task_id, task_text):
+        task_field = ft.TextField(read_only=True, value=task_text, expand=True)
 
 
+        def enable_edit(e):
+            task_field.read_only = not task_field.read_only
+            page.update()
+
+        edit_button = ft.IconButton(icon=ft.icons.EDIT, on_click=enable_edit)
+
+
+        def save_task(e):
+            main_db.update_task(task_id=task_id, new_task=task_field.value)
+            task_field.read_only = True
+            page.update()
+
+        save_button = ft.IconButton(icon=ft.icons.SAVE, on_click=save_task)
+
+
+        task_row = ft.Row([task_field, edit_button, save_button])
+
+
+        def delete_task(e):
+            main_db.delete_task(task_id=task_id)
+            if task_row in task_list.controls:
+                task_list.controls.remove(task_row)
+
+
+        delete_button = ft.IconButton(icon=ft.icons.DELETE,icon_color=ft.colors.RED,on_click=delete_task)
+
+        task_row.controls.append(delete_button)
+
+        return task_row
+
+
+    def add_task_db(_):
+        if task_input.value:
+            task_text = task_input.value
+            new_task_id = main_db.add_task(task=task_text)
+            task_list.controls.append(view_task(task_id=new_task_id, task_text=task_text))
+            task_input.value = None
+            page.update()
+
+
+    task_input = ft.TextField(label="Введите задачу", expand=True, on_submit=add_task_db)
+    task_add_button = ft.IconButton(icon=ft.icons.ADD, on_click=add_task_db)
+
+    input_row = ft.Row([task_input, task_add_button])
+
+    page.add(input_row, task_list)
+
+
+if __name__ == "__main__":
+    main_db.init_db()
+    ft.run(main)
